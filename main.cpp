@@ -16,6 +16,9 @@
 
 //Labyrinth things
 int readLabyrinth(const char* fileName, float** vertV, float** vertH);
+int amIInTheWall(float preX, float preZ);
+void pointToCube(float* verts, float pointX, float pointZ, float heightZero, float heightCube, float diffX, float diffZ);
+void wallElems(GLuint* elems, int offset=0);
 const float wallWidth = 0.1f;
 const float wallHeight = 1.0f;
 const float labyrinthFloorEdge = 3.0f;
@@ -66,37 +69,11 @@ GLuint elements[4*6];
 
 // spawn
 float verticesSpawn[24];
-GLuint elementsSpawn[] = {
-	//floor
-	0, 1, 2, 3,
-	//front
-	1,2,6,5,
-	//back
-	3,0,4,7,
-	//right
-	2,3,7,6,
-	//left
-	0,1,5,4,
-	//roof
-	4,5,6,7,
-};
+GLuint elementsSpawn[24];
 
 // goal
 float verticesGoal[24];
-GLuint elementsGoal[] = {
-	//floor
-	0, 1, 2, 3,
-	//front
-	1,2,6,5,
-	//back
-	3,0,4,7,
-	//right
-	2,3,7,6,
-	//left
-	0,1,5,4,
-	//roof
-	4,5,6,7,
-};
+GLuint elementsGoal[24];
 
 //shaders
 GLuint programID = 0;
@@ -160,58 +137,11 @@ void klawisz(GLubyte key, int x, int y)
 	{
 		float preX = spawn[0] + dx + ms * cos(glm::radians(camAngle));
 		float preZ = spawn[1] + dz + ms * sin(glm::radians(camAngle));
-		// check for walls
-		float l, r, u, d;
-
-		// vertical:
-		int i = 0;
-		for (i = 0; i < verticalWallCounter; i++)
+		int k = amIInTheWall(preX, preZ);
+		if (k == 0)
 		{
-			// between x?
-			//                   const  +  3*v# + x         x-0 y-1 z-2
-			l = verticesVertical[24 * i + 3 * 1 + 0];
-			r = verticesVertical[24 * i + 3 * 2 + 0];
-			if (preX < r && preX > l)
-			{
-				// between z
-				u = verticesVertical[24 * i + 3 * 0 + 2];
-				d = verticesVertical[24 * i + 3 * 1 + 2];
-				if (preZ < u && preZ > d)
-				{
-					// revert the changes
-					//dx -= ms * cos(glm::radians(camAngle));
-					//dz -= ms * sin(glm::radians(camAngle));
-					break;
-				}
-			}
-		}
-		if (i == verticalWallCounter) // only if not in any of the vertical walls - check for horizontal walls
-		{
-			for (i = 0; i < horizontalWallCounter; i++)
-			{
-				// between x?
-				//                      const  +  3*v# + x         x-0 y-1 z-2
-				l = verticesHorizontal[24 * i + 3 * 1 + 0] - visibilityClip;
-				r = verticesHorizontal[24 * i + 3 * 2 + 0] + visibilityClip;
-				if (preX < r && preX > l)
-				{
-					// between z
-					u = verticesHorizontal[24 * i + 3 * 0 + 2] + visibilityClip;
-					d = verticesHorizontal[24 * i + 3 * 1 + 2] - visibilityClip;
-					if (preZ < u && preZ > d)
-					{
-						// revert the changes
-						//dx -= ms * cos(glm::radians(camAngle));
-						//dz -= ms * sin(glm::radians(camAngle));
-						break;
-					}
-				}
-			}
-			if (i == horizontalWallCounter) // if not in any wall
-			{
-				dx += ms * cos(glm::radians(camAngle));
-				dz += ms * sin(glm::radians(camAngle));
-			}
+			dx += ms * cos(glm::radians(camAngle));
+			dz += ms * sin(glm::radians(camAngle));
 		}
 		break;
 	}
@@ -219,58 +149,11 @@ void klawisz(GLubyte key, int x, int y)
 	{
 		float preX = spawn[0] + dx - ms * cos(glm::radians(camAngle));
 		float preZ = spawn[1] + dz - ms * sin(glm::radians(camAngle));
-		// check for walls
-		float l, r, u, d;
-
-		// vertical:
-		int i = 0;
-		for (i = 0; i < verticalWallCounter; i++)
+		int k = amIInTheWall(preX, preZ);
+		if (k == 0)
 		{
-			// between x?
-			//                   const  +  3*v# + x         x-0 y-1 z-2
-			l = verticesVertical[24 * i + 3 * 1 + 0];
-			r = verticesVertical[24 * i + 3 * 2 + 0];
-			if (preX < r && preX > l)
-			{
-				// between z
-				u = verticesVertical[24 * i + 3 * 0 + 2];
-				d = verticesVertical[24 * i + 3 * 1 + 2];
-				if (preZ < u && preZ > d)
-				{
-					// revert the changes
-					//dx -= ms * cos(glm::radians(camAngle));
-					//dz -= ms * sin(glm::radians(camAngle));
-					break;
-				}
-			}
-		}
-		if (i == verticalWallCounter) // only if not in any of the vertical walls - check for horizontal walls
-		{
-			for (i = 0; i < horizontalWallCounter; i++)
-			{
-				// between x?
-				//                      const  +  3*v# + x         x-0 y-1 z-2
-				l = verticesHorizontal[24 * i + 3 * 1 + 0] - visibilityClip;
-				r = verticesHorizontal[24 * i + 3 * 2 + 0] + visibilityClip;
-				if (preX < r && preX > l)
-				{
-					// between z
-					u = verticesHorizontal[24 * i + 3 * 0 + 2] + visibilityClip;
-					d = verticesHorizontal[24 * i + 3 * 1 + 2] - visibilityClip;
-					if (preZ < u && preZ > d)
-					{
-						// revert the changes
-						//dx -= ms * cos(glm::radians(camAngle));
-						//dz -= ms * sin(glm::radians(camAngle));
-						break;
-					}
-				}
-			}
-			if (i == horizontalWallCounter) // if not in any wall
-			{
-				dx -= ms * cos(glm::radians(camAngle));
-				dz -= ms * sin(glm::radians(camAngle));
-			}
+			dx -= ms * cos(glm::radians(camAngle));
+			dz -= ms * sin(glm::radians(camAngle));
 		}
 		break;
 	}
@@ -278,58 +161,11 @@ void klawisz(GLubyte key, int x, int y)
 	{
 		float preX = spawn[0] + dx - ms * sin(glm::radians(camAngle));
 		float preZ = spawn[1] + dz + ms * cos(glm::radians(camAngle));
-		// check for walls
-		float l, r, u, d;
-
-		// vertical:
-		int i = 0;
-		for (i = 0; i < verticalWallCounter; i++)
+		int k = amIInTheWall(preX, preZ);
+		if (k == 0)
 		{
-			// between x?
-			//                   const  +  3*v# + x         x-0 y-1 z-2
-			l = verticesVertical[24 * i + 3 * 1 + 0];
-			r = verticesVertical[24 * i + 3 * 2 + 0];
-			if (preX < r && preX > l)
-			{
-				// between z
-				u = verticesVertical[24 * i + 3 * 0 + 2];
-				d = verticesVertical[24 * i + 3 * 1 + 2];
-				if (preZ < u && preZ > d)
-				{
-					// revert the changes
-					//dx -= ms * cos(glm::radians(camAngle));
-					//dz -= ms * sin(glm::radians(camAngle));
-					break;
-				}
-			}
-		}
-		if (i == verticalWallCounter) // only if not in any of the vertical walls - check for horizontal walls
-		{
-			for (i = 0; i < horizontalWallCounter; i++)
-			{
-				// between x?
-				//                      const  +  3*v# + x         x-0 y-1 z-2
-				l = verticesHorizontal[24 * i + 3 * 1 + 0] - visibilityClip;
-				r = verticesHorizontal[24 * i + 3 * 2 + 0] + visibilityClip;
-				if (preX < r && preX > l)
-				{
-					// between z
-					u = verticesHorizontal[24 * i + 3 * 0 + 2] + visibilityClip;
-					d = verticesHorizontal[24 * i + 3 * 1 + 2] - visibilityClip;
-					if (preZ < u && preZ > d)
-					{
-						// revert the changes
-						//dx -= ms * cos(glm::radians(camAngle));
-						//dz -= ms * sin(glm::radians(camAngle));
-						break;
-					}
-				}
-			}
-			if (i == horizontalWallCounter) // if not in any wall
-			{
-				dz += ms * cos(glm::radians(camAngle));
-				dx -= ms * sin(glm::radians(camAngle));
-			}
+			dx -= ms * sin(glm::radians(camAngle));
+			dz += ms * cos(glm::radians(camAngle));
 		}
 		break;
 	}
@@ -338,57 +174,11 @@ void klawisz(GLubyte key, int x, int y)
 		float preX = spawn[0] + dx + ms * sin(glm::radians(camAngle));
 		float preZ = spawn[1] + dz - ms * cos(glm::radians(camAngle));
 		// check for walls
-		float l, r, u, d;
-
-		// vertical:
-		int i = 0;
-		for (i = 0; i < verticalWallCounter; i++)
+		int k = amIInTheWall(preX, preZ);
+		if (k == 0)
 		{
-			// between x?
-			//                   const  +  3*v# + x         x-0 y-1 z-2
-			l = verticesVertical[24 * i + 3 * 1 + 0];
-			r = verticesVertical[24 * i + 3 * 2 + 0];
-			if (preX < r && preX > l)
-			{
-				// between z
-				u = verticesVertical[24 * i + 3 * 0 + 2];
-				d = verticesVertical[24 * i + 3 * 1 + 2];
-				if (preZ < u && preZ > d)
-				{
-					// revert the changes
-					//dx -= ms * cos(glm::radians(camAngle));
-					//dz -= ms * sin(glm::radians(camAngle));
-					break;
-				}
-			}
-		}
-		if (i == verticalWallCounter) // only if not in any of the vertical walls - check for horizontal walls
-		{
-			for (i = 0; i < horizontalWallCounter; i++)
-			{
-				// between x?
-				//                      const  +  3*v# + x         x-0 y-1 z-2
-				l = verticesHorizontal[24 * i + 3 * 1 + 0] - visibilityClip;
-				r = verticesHorizontal[24 * i + 3 * 2 + 0] + visibilityClip;
-				if (preX < r && preX > l)
-				{
-					// between z
-					u = verticesHorizontal[24 * i + 3 * 0 + 2] + visibilityClip;
-					d = verticesHorizontal[24 * i + 3 * 1 + 2] - visibilityClip;
-					if (preZ < u && preZ > d)
-					{
-						// revert the changes
-						//dx -= ms * cos(glm::radians(camAngle));
-						//dz -= ms * sin(glm::radians(camAngle));
-						break;
-					}
-				}
-			}
-			if (i == horizontalWallCounter) // if not in any wall
-			{
-				dz -= ms * cos(glm::radians(camAngle));
-				dx += ms * sin(glm::radians(camAngle));
-			}
+			dx += ms * sin(glm::radians(camAngle));
+			dz -= ms * cos(glm::radians(camAngle));
 		}
 		break;
 	}
@@ -420,11 +210,7 @@ void rysuj(void)
 
 		MV = glm::rotate(MV, (float)glm::radians(180.0f), glm::vec3(0, 1, 0));
 		MV = glm::rotate(MV, (float)glm::radians(camAngle), glm::vec3(0, 1, 0));
-
-		//MV = glm::translate(MV, glm::vec3(-(spawn[0] + dx) * cos(camAngle), -characterHeight, -(spawn[1] + dz) * cos(camAngle)));
 		MV = glm::translate(MV, glm::vec3(-(spawn[0] + dx), -characterHeight, -(spawn[1] + dz)));
-		//MV = glm::translate(MV, glm::vec3(-dx * cos(glm::radians(camAngle)), 0, -dz * sin(glm::radians(camAngle))));
-		//MV = glm::rotate(MV, (float)glm::radians(kameraZ), glm::vec3(0, 1, 0));
 	}
 	else
 	{
@@ -507,21 +293,6 @@ GLfloat ad = 0.0;
 
 void timer(int value) {
 
-	//ad+= k;
-
-	//if(ad>1 || ad<0)
-	//k=-k;
-
-	//GLfloat attrib[] = { ad, 0.0f,0.0f };
-	// Aktualizacja wartości atrybutu wejściowego 1.
-	//glVertexAttrib3fv(1, attrib);
-
-	/*
-
-	W vertex_shader np:
-	layout (location = 1) in vec3 incolor;
-
-	*/
 	glutTimerFunc(20, timer, 0);
 }
 /*###############################################################*/
@@ -573,106 +344,13 @@ int main(int argc, char** argv)
 	// vertices - floor
 	float floorMargin = wallWidth + labyrinthFloorEdge;
 
-	vertices[0] = -floorMargin;
-	vertices[1] = -floorHeight;
-	vertices[2] = -floorMargin;
-
-	vertices[3] = xLabDim - 1 + floorMargin;
-	vertices[4] = -floorHeight;
-	vertices[5] = -floorMargin;
-
-	vertices[6] = xLabDim - 1 + floorMargin;
-	vertices[7] = -floorHeight;
-	vertices[8] = yLabDim - 1 + floorMargin;
-
-	vertices[9] = -floorMargin;
-	vertices[10] = -floorHeight;
-	vertices[11] = yLabDim - 1 + floorMargin;
-
-	vertices[12] = vertices[0];
-	vertices[13] = 0.0f;
-	vertices[14] = vertices[2];
-
-	vertices[15] = vertices[3];
-	vertices[16] = 0.0f;
-	vertices[17] = vertices[5];
-
-	vertices[18] = vertices[6];
-	vertices[19] = 0.0f;
-	vertices[20] = vertices[8];
-
-	vertices[21] = vertices[9];
-	vertices[22] = 0.0f;
-	vertices[23] = vertices[11];
-
-	//floor
-	elements[0] = 0;
-	elements[1] = 1;
-	elements[2] = 2;
-	elements[3] = 3;
-
-	//front
-	elements[4] = 1;
-	elements[5] = 2;
-	elements[6] = 6;
-	elements[7] = 5;
-
-	//back
-	elements[8] = 3;
-	elements[9] = 0;
-	elements[10] = 4;
-	elements[11] = 7;
-
-	//right
-	elements[12] = 2;
-	elements[13] = 3;
-	elements[14] = 7;
-	elements[15] = 6;
-
-	//left
-	elements[16] = 0;
-	elements[17] = 1;
-	elements[18] = 5;
-	elements[19] = 4;
-
-	//roof
-	elements[20] = 4;
-	elements[21] = 5;
-	elements[22] = 6;
-	elements[23] = 7;
+	pointToCube(vertices, xLabDim / 2.0f, yLabDim / 2.0f, -floorHeight, 0.0f, floorMargin + xLabDim/2.0f, floorMargin + yLabDim/2.0f);
+	wallElems(elements);
 
 	// vertices - spawn & goal
-	verticesGoal[0] = goal[0] - 0.125f;
-	verticesGoal[1] = 0.4f;
-	verticesGoal[2] = goal[1] + 0.5f;
-
-	verticesGoal[3] = goal[0] - 0.125f;
-	verticesGoal[4] = 0.4f;
-	verticesGoal[5] = goal[1] + 0.25f;
-
-	verticesGoal[6] = goal[0] + 0.125f;
-	verticesGoal[7] = 0.4f;
-	verticesGoal[8] = goal[1] + 0.25f;
-
-	verticesGoal[9] = goal[0] + 0.125f;
-	verticesGoal[10] = 0.4f;
-	verticesGoal[11] = goal[1] + 0.5f;
-
-	verticesGoal[12] = goal[0] - 0.125f;
-	verticesGoal[13] = 0.6f;
-	verticesGoal[14] = goal[1] + 0.5f;
-
-	verticesGoal[15] = goal[0] - 0.125f;
-	verticesGoal[16] = 0.6f;
-	verticesGoal[17] = goal[1] + 0.25f;
-
-	verticesGoal[18] = goal[0] + 0.125f;
-	verticesGoal[19] = 0.6f;
-	verticesGoal[20] = goal[1] + 0.25f;
-
-	verticesGoal[21] = goal[0] + 0.125f;
-	verticesGoal[22] = 0.6f;
-	verticesGoal[23] = goal[1] + 0.5f;
+	//wallElems(elementsSpawn);
+	pointToCube(verticesGoal, goal[0], goal[1] + 0.375f, 0.4f, 0.6f, 0.125f, 0.125f);
+	wallElems(elementsGoal);
 
 	// 0   P   3
 	//
@@ -686,77 +364,9 @@ int main(int argc, char** argv)
 
 	for (int i = 0; i < verticalWallCounter; i++)
 	{
-		verticesVertical[24*i] = vertV[2*i] - wallWidth;			// x
-		verticesVertical[24*i + 1] = 0.0f;							// y
-		verticesVertical[24*i + 2] = vertV[2*i+1] + wallWidth;      // z
-
-		verticesVertical[24*i+3] = vertV[2*i] - wallWidth;			// x
-		verticesVertical[24*i + 4] = 0.0f;							// y
-		verticesVertical[24*i + 5] = vertV[2*i+1] - 1 - wallWidth;  // z
-
-		verticesVertical[24*i+6] = vertV[2*i] + wallWidth;			// x
-		verticesVertical[24*i + 7] = 0.0f;							// y
-		verticesVertical[24*i + 8] = vertV[2*i+1] - 1 - wallWidth;  // z
-
-		verticesVertical[24*i+9] = vertV[2*i] + wallWidth;			// x
-		verticesVertical[24*i + 10] = 0.0f;							// y
-		verticesVertical[24*i + 11] = vertV[2*i+1] + wallWidth;     // z
-
-		//----------------------------------------------
-
-		verticesVertical[24*i+12] = vertV[2*i] - wallWidth;			// x
-		verticesVertical[24*i + 13] = wallHeight;					// y
-		verticesVertical[24*i + 14] = vertV[2*i+1] + wallWidth;     // z
-
-		verticesVertical[24*i+15] = vertV[2*i] - wallWidth;			// x
-		verticesVertical[24*i + 16] = wallHeight;					// y
-		verticesVertical[24*i + 17] = vertV[2*i+1] - 1 - wallWidth; // z
-
-		verticesVertical[24*i+18] = vertV[2*i] + wallWidth;			 // x
-		verticesVertical[24*i + 19] = wallHeight;					 // y
-		verticesVertical[24*i + 20] = vertV[2*i+1] - 1 - wallWidth;  // z
-
-		verticesVertical[24*i+21] = vertV[2*i] + wallWidth;			// x
-		verticesVertical[24*i + 22] = wallHeight;					// y
-		verticesVertical[24*i + 23] = vertV[2*i+1] + wallWidth;     // z
-
-		//------------------------------------------------
-
-		// floor
-		elementsVertical[24*i] = 8*i;
-		elementsVertical[24*i+1] = 8*i+1;
-		elementsVertical[24*i+2] = 8*i+2;
-		elementsVertical[24*i+3] = 8*i+3;
-
-		//front
-		elementsVertical[24 * i+4] = 8 * i+1;
-		elementsVertical[24 * i + 5] = 8 * i + 2;
-		elementsVertical[24 * i + 6] = 8 * i + 6;
-		elementsVertical[24 * i + 7] = 8 * i + 5;
-
-		//back
-		elementsVertical[24 * i + 8] = 8 * i + 3;
-		elementsVertical[24 * i + 9] = 8 * i + 0;
-		elementsVertical[24 * i + 10] = 8 * i + 4;
-		elementsVertical[24 * i + 11] = 8 * i + 7;
-
-		//left
-		elementsVertical[24 * i + 12] = 8 * i + 0;
-		elementsVertical[24 * i + 13] = 8 * i + 1;
-		elementsVertical[24 * i + 14] = 8 * i + 5;
-		elementsVertical[24 * i + 15] = 8 * i + 4;
-
-		//right
-		elementsVertical[24 * i + 16] = 8 * i + 2;
-		elementsVertical[24 * i + 17] = 8 * i + 3;
-		elementsVertical[24 * i + 18] = 8 * i + 7;
-		elementsVertical[24 * i + 19] = 8 * i + 6;
-
-		//roof
-		elementsVertical[24 * i + 20] = 8 * i + 4;
-		elementsVertical[24 * i + 21] = 8 * i + 5;
-		elementsVertical[24 * i + 22] = 8 * i + 6;
-		elementsVertical[24 * i + 23] = 8 * i + 7;
+		pointToCube(verticesVertical + (24 * i), vertV[2 * i], vertV[2 * i + 1] - 0.5f, 0.0f, wallHeight, wallWidth, wallWidth + 0.5f);
+	
+		wallElems(elementsVertical + 24 * i, 8*i);
 	}
 
 	// 0        3
@@ -766,77 +376,9 @@ int main(int argc, char** argv)
 
 	for (int i = 0; i < horizontalWallCounter; i++)
 	{
-		verticesHorizontal[24 * i] = vertH[2*i] - wallWidth;				 // x
-		verticesHorizontal[24 * i + 1] = 0.0f;							    // y
-		verticesHorizontal[24 * i + 2] = vertH[2*i + 1] + wallWidth;       // z
-
-		verticesHorizontal[24 * i + 3] = vertH[2*i] - wallWidth;			// x
-		verticesHorizontal[24 * i + 4] = 0.0f;							    // y
-		verticesHorizontal[24 * i + 5] = vertH[2*i + 1] - wallWidth;		// z
-
-		verticesHorizontal[24 * i + 6] = vertH[2*i] + 1 + wallWidth;		// x
-		verticesHorizontal[24 * i + 7] = 0.0f;							    // y
-		verticesHorizontal[24 * i + 8] = vertH[2*i + 1] - wallWidth;		// z
-
-		verticesHorizontal[24 * i + 9] = vertH[2*i] + 1 + wallWidth;		// x
-		verticesHorizontal[24 * i + 10] = 0.0f;						       // y
-		verticesHorizontal[24 * i + 11] = vertH[2*i + 1] + wallWidth;     // z
-
-		//----------------------------------------------
-
-		verticesHorizontal[24 * i + 12] = vertH[2*i] - wallWidth;		// x
-		verticesHorizontal[24 * i + 13] = wallHeight;					// y
-		verticesHorizontal[24 * i + 14] = vertH[2*i + 1] + wallWidth;   // z
-
-		verticesHorizontal[24 * i + 15] = vertH[2*i] - wallWidth;		// x
-		verticesHorizontal[24 * i + 16] = wallHeight;					// y
-		verticesHorizontal[24 * i + 17] = vertH[2*i + 1] - wallWidth;	// z
-
-		verticesHorizontal[24 * i + 18] = vertH[2*i] + 1 + wallWidth;	// x
-		verticesHorizontal[24 * i + 19] = wallHeight;					// y
-		verticesHorizontal[24 * i + 20] = vertH[2*i + 1] - wallWidth;	// z
-
-		verticesHorizontal[24 * i + 21] = vertH[2*i] + 1 + wallWidth;	// x
-		verticesHorizontal[24 * i + 22] = wallHeight;					// y
-		verticesHorizontal[24 * i + 23] = vertH[2*i + 1] + wallWidth;   // z
-
-		//------------------------------------------------
-
-		// floor
-		elementsHorizontal[24 * i] = 8 * i;
-		elementsHorizontal[24 * i + 1] = 8 * i + 1;
-		elementsHorizontal[24 * i + 2] = 8 * i + 2;
-		elementsHorizontal[24 * i + 3] = 8 * i + 3;
-
-		//front
-		elementsHorizontal[24 * i + 4] = 8 * i + 1;
-		elementsHorizontal[24 * i + 5] = 8 * i + 2;
-		elementsHorizontal[24 * i + 6] = 8 * i + 6;
-		elementsHorizontal[24 * i + 7] = 8 * i + 5;
-
-		//back
-		elementsHorizontal[24 * i + 8] = 8 * i + 3;
-		elementsHorizontal[24 * i + 9] = 8 * i + 0;
-		elementsHorizontal[24 * i + 10] = 8 * i + 4;
-		elementsHorizontal[24 * i + 11] = 8 * i + 7;
-
-		//left
-		elementsHorizontal[24 * i + 12] = 8 * i + 0;
-		elementsHorizontal[24 * i + 13] = 8 * i + 1;
-		elementsHorizontal[24 * i + 14] = 8 * i + 5;
-		elementsHorizontal[24 * i + 15] = 8 * i + 4;
-
-		//right
-		elementsHorizontal[24 * i + 16] = 8 * i + 2;
-		elementsHorizontal[24 * i + 17] = 8 * i + 3;
-		elementsHorizontal[24 * i + 18] = 8 * i + 7;
-		elementsHorizontal[24 * i + 19] = 8 * i + 6;
-
-		//roof
-		elementsHorizontal[24 * i + 20] = 8 * i + 4;
-		elementsHorizontal[24 * i + 21] = 8 * i + 5;
-		elementsHorizontal[24 * i + 22] = 8 * i + 6;
-		elementsHorizontal[24 * i + 23] = 8 * i + 7;
+		pointToCube(verticesHorizontal + 24 * i, vertH[2 * i] + 0.5f, vertH[2 * i + 1], 0.0f, wallHeight, wallWidth + 0.5f, wallWidth);
+		
+		wallElems(elementsHorizontal + 24*i, 8 * i);
 	}
 
 	glGenVertexArrays(5, VAO);
@@ -1007,4 +549,127 @@ int readLabyrinth(const char* fileName, float** vertV, float** vertH)
 	horizontalWallCounter /= 2;
 
 	return 1;
+}
+
+int amIInTheWall(float preX, float preZ)
+{
+	// check for walls
+	float l, r, u, d;
+
+	// vertical:
+	int i = 0;
+	for (i = 0; i < verticalWallCounter; i++)
+	{
+		// between x?
+		//                   const  +  3*v# + x         x-0 y-1 z-2
+		l = verticesVertical[24 * i + 3 * 1 + 0] - visibilityClip;
+		r = verticesVertical[24 * i + 3 * 2 + 0] + visibilityClip;
+		if (preX < r && preX > l)
+		{
+			// between z
+			u = verticesVertical[24 * i + 3 * 0 + 2] + visibilityClip;
+			d = verticesVertical[24 * i + 3 * 1 + 2] - visibilityClip;
+			if (preZ < u && preZ > d)
+			{
+				// revert the changes
+				//break;
+				return 1;
+			}
+		}
+	}
+	for (i = 0; i < horizontalWallCounter; i++)
+	{
+		// between x?
+		//                      const  +  3*v# + x         x-0 y-1 z-2
+		l = verticesHorizontal[24 * i + 3 * 1 + 0] - visibilityClip;
+		r = verticesHorizontal[24 * i + 3 * 2 + 0] + visibilityClip;
+		if (preX < r && preX > l)
+		{
+			// between z
+			u = verticesHorizontal[24 * i + 3 * 0 + 2] + visibilityClip;
+			d = verticesHorizontal[24 * i + 3 * 1 + 2] - visibilityClip;
+			if (preZ < u && preZ > d)
+			{
+				// revert the changes
+				//break;
+				return 1;
+			}
+		}
+	}
+	// if not in any wall
+	return 0;
+}
+
+void pointToCube(float* verts, float pointX, float pointZ, float heightZero, float heightCube, float diffX, float diffZ)
+{
+	verts[0] = pointX - diffX;
+	verts[1] = heightZero;
+	verts[2] = pointZ + diffZ;
+
+	verts[3] = pointX - diffX;
+	verts[4] = heightZero;
+	verts[5] = pointZ - diffZ;
+
+	verts[6] = pointX + diffX;
+	verts[7] = heightZero;
+	verts[8] = pointZ - diffZ;
+
+	verts[9] = pointX + diffX;
+	verts[10] = heightZero;
+	verts[11] = pointZ + diffZ;
+
+	verts[12] = verts[0];
+	verts[13] = heightCube;
+	verts[14] = verts[2];
+
+	verts[15] = verts[3];
+	verts[16] = heightCube;
+	verts[17] = verts[5];
+
+	verts[18] = verts[6];
+	verts[19] = heightCube;
+	verts[20] = verts[8];
+
+	verts[21] = verts[9];
+	verts[22] = heightCube;
+	verts[23] = verts[11];
+}
+
+void wallElems(GLuint* elems, int offset)
+{
+	//floor
+	elems[0] = offset + 0;
+	elems[1] = offset + 1;
+	elems[2] = offset + 2;
+	elems[3] = offset + 3;
+
+	//front
+	elems[4] = offset + 1;
+	elems[5] = offset + 2;
+	elems[6] = offset + 6;
+	elems[7] = offset + 5;
+
+	//back
+	elems[8] = offset + 3;
+	elems[9] = offset + 0;
+	elems[10] = offset + 4;
+	elems[11] = offset + 7;
+
+	//right
+	elems[12] = offset + 2;
+	elems[13] = offset + 3;
+	elems[14] = offset + 7;
+	elems[15] = offset + 6;
+
+	//left
+	elems[16] = offset + 0;
+	elems[17] = offset + 1;
+	elems[18] = offset + 5;
+	elems[19] = offset + 4;
+
+	//roof
+	elems[20] = offset + 4;
+	elems[21] = offset + 5;
+	elems[22] = offset + 6;
+	elems[23] = offset + 7;
 }
